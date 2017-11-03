@@ -1,42 +1,31 @@
 #!/bin/sh
 
-if [ "$#" -lt "2" ]
-then
-  echo "Usage: $0 <pattern> <logfile1 [... logfilen]>" >&2
-  exit 1
+GREP="grep"
+
+if [ $# -eq 0 -o "$1" = "-h" ] ; then
+    echo "Usage: $0 pattern logfile1 [... logfileN]"
+    exit 1
 fi
 
 pattern="$1"
 
-shift
-
-# TODO: support mixed compressed file formats
-
-GREP=grep
-FGREP=fgrep
-
-if echo "$1" | grep -q '\.gz$'
-then
-  GREP=zgrep
-  FGREP=zfgrep
-elif echo "$1" | grep -q '\.bz2$'
-then
-  GREP=bzgrep
-  FGREP=bzfgrep
+if [ -z "$2" ] ; then
+    logfiles='/var/log/maillog'
+else
+    shift
+    logfiles="$@"
 fi
 
-ids=$($GREP -i "postfix/.*$pattern" "$@" | sed -e 's/ \+/ /g' | cut -d \  -f 6 | cut -sd : -f 1 | sort | uniq)
+ids=$($GREP -i "postfix/.*$pattern" "$logfiles" | awk '{print $6}' | sed 's/://')
 
 test -z "$ids" && exit
-
-# FIXME: This is terribly suboptimal
 
 for id in $ids
 do
   if [ "$id" = "NOQUEUE" ]
   then
-    $GREP " $id:.*$pattern" "$@" && echo
+    $GREP " $id:.*$pattern" "$logfiles" && echo
   else
-    $FGREP " $id: " "$@" && echo
+    $GREP " $id: " "$logfiles" && echo
   fi
 done
